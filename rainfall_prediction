@@ -1,0 +1,118 @@
+/* Importing Libraries */
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sb
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn import metrics
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from sklearn.linear_model import LogisticRegression
+from imblearn.over_sampling import RandomOverSampler
+
+import warnings
+warnings.filterwarnings('ignore')
+
+/* Now let’s load the dataset into the panda’s data frame and print its first five rows. */
+data= pd.read_csv('Rainfall.csv')
+data
+/* Now let’s check the size of the dataset. */
+data.shape
+
+/* Let’s check which column of the dataset contains which type of data. */
+data.info()
+/* As per the above information regarding the data in each column, we can observe that there are no null values. */
+data.describe().T
+/* Data Cleaning */
+df.isnull().sum()
+/* So there is one null value in the ‘winddirection’ as well as the ‘windspeed’ column. But what’s up with the column name wind direction? */
+df.columns
+/* Here we can observe that there are unnecessary spaces in the names of the columns let’s remove that */
+df.rename(str.strip,
+		axis='columns', 
+		inplace=True)
+df.columns
+/* Now it’s time for null value imputation. */
+for col in df.columns:
+
+# Checking if the column contains
+# any null values
+if df[col].isnull().sum() > 0:
+	val = df[col].mean()
+	df[col] = df[col].fillna(val)
+	
+df.isnull().sum().sum()
+
+/* Exploratory Data Analysis */
+plt.pie(df['rainfall'].value_counts().values,
+		labels = df['rainfall'].value_counts().index,
+		autopct='%1.1f%%')
+plt.show()
+df.groupby('rainfall').mean()
+/* The observations we have drawn from the above dataset are very much similar to what is observed in real life as well. */
+features = list(df.select_dtypes(include = np.number).columns)
+features.remove('day')
+print(features)
+/* Let’s check the distribution of the continuous features given in the dataset. */
+plt.subplots(figsize=(15,8))
+for i, col in enumerate(features):
+plt.subplot(3,4, i + 1)
+sb.distplot(df[col])
+plt.tight_layout()
+plt.show()
+/* Let’s draw boxplots for the continuous variable to detect the outliers present in the data. */
+plt.subplots(figsize=(15,8))
+for i, col in enumerate(features):
+plt.subplot(3,4, i + 1)
+sb.boxplot(df[col])
+plt.tight_layout()
+plt.show()
+/* There are outliers in the data but sadly we do not have much data so, we cannot remove this. */
+df.replace({'yes':1, 'no':0}, inplace=True)
+/* Sometimes there are highly correlated features that just increase the dimensionality of the feature space and do not good for the model’s performance. So we must check whether there are highly correlated features in this dataset or not. */
+plt.figure(figsize=(10,10))
+sb.heatmap(df.corr() > 0.8,
+		annot=True,
+		cbar=False)
+plt.show()
+/* Now we will remove the highly correlated features ‘maxtemp’ and ‘mintemp’. But why not temp or dewpoint? This is because temp and dewpoint provide distinct information regarding the weather and atmospheric conditions. */
+df.drop(['maxtemp', 'mintemp'], axis=1, inplace=True)
+
+/* Model Training */
+features = df.drop(['day', 'rainfall'], axis=1)
+target = df.rainfall
+
+
+/* As we found earlier that the dataset we were using was imbalanced so, we will have to balance the training data before feeding it to the model. */
+X_train, X_val, 
+Y_train, Y_val = train_test_split(features,target,test_size=0.2,
+stratify=target,random_state=2)
+# As the data was highly imbalanced we will
+# balance it by adding repetitive rows of minority class.
+ros = RandomOverSampler(sampling_strategy='minority',random_state=22)
+X, Y = ros.fit_resample(X_train, Y_train)
+
+/* The features of the dataset were at different scales so, normalizing it before training will help us to obtain optimum results faster along with stable training. */
+# Normalizing the features for stable and fast training.
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+X_val = scaler.transform(X_val)
+
+/* Now let’s train some state-of-the-art models for classification and train them on our training data. */
+models = [LogisticRegression(), XGBClassifier(), SVC(kernel='rbf', probability=True)]
+for i in range(3):
+models[i].fit(X, Y)
+print(f'{models[i]} : ')
+train_preds = models[i].predict_proba(X) 
+print('Training Accuracy : ', metrics.roc_auc_score(Y, train_preds[:,1]))
+val_preds = models[i].predict_proba(X_val) 
+print('Validation Accuracy : ', metrics.roc_auc_score(Y_val, val_preds[:,1]))
+print()
+/* Model Evaluation */
+metrics.plot_confusion_matrix(models[2], X_val, Y_val)
+plt.show()
+/* Let’s plot the classification report as well for the validation data using the SVC model. */
+print(metrics.classification_report(Y_val,models[2].predict(X_val)))
